@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formularz Rejestracji</title>
+</head>
+<body>
+
+<h1>Formularz Rejestracji</h1>
+
+<form id="registrationForm">
+    <label for="username">Nazwa użytkownika:</label>
+    <input type="text" id="username" name="username" required>
+
+    <label for="email">Adres email:</label>
+    <input type="email" id="email" name="email" required>
+
+    <label for="password">Hasło:</label>
+    <input type="password" id="password" name="password" required>
+
+    <button type="button" onclick="submitForm()">Zarejestruj</button>
+</form>
+
+<!-- Dodany kontener na komunikaty zwrotne -->
+<div id="responseContainer"></div>
+
+<script>
+    function submitForm() {
+        var username = document.getElementById("username").value;
+        var email = document.getElementById("email").value;
+        var password = document.getElementById("password").value;
+
+        var requestData = {
+            "username": username,
+            "email": email,
+            "password": password
+        };
+
+        // Wysyłanie żądania POST do API
+        fetch("http://127.0.0.1:8000/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => {
+            if (response.status === 200) {
+                return response.json();
+            } else {
+                throw new Error("Błąd podczas rejestracji. Kod odpowiedzi: " + response.status);
+            }
+        })
+        .then(data => {
+            console.log("Odpowiedź z serwera:", data);
+
+            // Dodanie komunikatu do kontenera
+            var responseContainer = document.getElementById("responseContainer");
+            responseContainer.innerHTML = "Odpowiedź z serwera: " + JSON.stringify(data);
+
+            // Przekierowanie na stronę główną po pomyślnym zarejestrowaniu
+            window.location.href = "index.html"; // Podaj ścieżkę do strony głównej
+        })
+        .catch(error => {
+            console.error("Błąd podczas wysyłania żądania:", error);
+
+            // Dodanie komunikatu błędu do kontenera
+            var responseContainer = document.getElementById("responseContainer");
+            responseContainer.innerHTML = "Błąd podczas wysyłania żądania: " + error.message;
+        });
+    }
+</script>
+
+</body>
+</html>

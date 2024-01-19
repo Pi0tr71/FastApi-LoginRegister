@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formularz Logowania</title>
+</head>
+<body>
+
+<h1>Formularz Logowania</h1>
+
+<form id="loginForm">
+    <label for="email">Adres email:</label>
+    <input type="email" id="email" name="email" required>
+
+    <label for="password">Hasło:</label>
+    <input type="password" id="password" name="password" required>
+
+    <button type="button" onclick="submitLoginForm()">Zaloguj</button>
+</form>
+
+<!-- Dodany kontener na komunikaty zwrotne -->
+<div id="responseContainer"></div>
+
+<script>
+    function submitLoginForm() {
+        var email = document.getElementById("email").value;
+        var password = document.getElementById("password").value;
+
+        var loginData = {
+            "email": email,
+            "password": password
+        };
+
+        // Wysyłanie żądania POST do API
+        fetch("http://127.0.0.1:8000/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(loginData)
+        })
+        .then(response => {
+            if (response.status === 200) {
+                return response.json();
+                console.log("Odpowiedź z serwera:", data);
+
+            // Dodanie komunikatu do kontenera
+            var responseContainer = document.getElementById("responseContainer");
+            responseContainer.innerHTML = "Odpowiedź z serwera: " + JSON.stringify(data);
+
+            // Przechwytywanie tokena i zapisywanie go (przyjmuję, że token znajduje się w polu "token" w odpowiedzi)
+            var token = data.token;
+            var username = data.username;
+
+            // Przechowywanie tokena np. w localStorage
+            localStorage.setItem("userToken", token);
+            localStorage.setItem("userName", username);
+
+            // Przekierowanie na stronę po zalogowaniu (możesz dostosować ścieżkę)
+            window.location.href = "dashboard.html"; // Podaj ścieżkę do strony po zalogowaniu
+             })
+            } else {
+                throw new Error("Błąd podczas logowania. Kod odpowiedzi: " + response.status);
+            }
+
+        .catch(error => {
+            console.error("Błąd podczas wysyłania żądania:", error);
+
+            // Dodanie komunikatu błędu do kontenera
+            var responseContainer = document.getElementById("responseContainer");
+            responseContainer.innerHTML = "Błąd podczas logowania: " + error.message;
+        });
+    }
+</script>
+
+</body>
+</html>
