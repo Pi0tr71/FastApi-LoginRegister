@@ -1,10 +1,11 @@
-from typing import Optional
 from pydantic import BaseModel
 import datetime
 
 
 class UserCreate(BaseModel):
     username: str
+    firstname: str
+    lastname: str
     email: str
     password: str
 
@@ -34,11 +35,14 @@ class TokenCreate(BaseModel):
 
 
 class UserProfile(BaseModel):
-    id: int
+    firstname: str
+    lastname: str
     username: str
     email: str
 
 
 class updateprofile(BaseModel):
-    username: Optional[str]
-    email: Optional[str]
+    firstname: str
+    lastname: str
+    username: str
+    email: str

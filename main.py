@@ -11,11 +11,13 @@ from datetime import datetime
 from models import TokenTable
 from auth_bearer import decodeJWT
 import uvicorn
-from fastapi.middleware.cors import CORSMiddleware
+import webbrowser
 
+# Tworzymy bazę danych
 Base.metadata.create_all(engine)
 
 
+# Funkcja zwracająca sesję do bazy danych
 def get_session():
     session = SessionLocal()
     try:
@@ -24,32 +26,30 @@ def get_session():
         session.close()
 
 
+# Inicjalizacja aplikacji FastAPI
 app = FastAPI()
 
-origins = [
-    "http://localhost",
-    "http://localhost:63342",
-    "http://localhost:8000",
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
+# Endpoint do rejestracji użytkownika
 @app.post("/register")
 def register_user(user: schemas.UserCreate, session: Session = Depends(get_session)):
+    # Sprawdzamy, czy żadne z pól nie są puste
+    if any(value == "" for value in [user.email, user.firstname, user.lastname, user.password, user.username]):
+        raise HTTPException(status_code=400,
+                            detail="Email, password, and username cannot be None. Please provide valid values for all fields.")
+    # Sprawdzamy, czy email już istnieje w bazie danych
     existing_user_email = session.query(models.User).filter_by(email=user.email).first()
     if existing_user_email:
         raise HTTPException(status_code=400, detail="Email already registered")
+    # Sprawdzamy, czy login już istnieje w bazie danych
     existing_user_login = session.query(models.User).filter_by(email=user.username).first()
     if existing_user_login:
         raise HTTPException(status_code=400, detail="Login already registered")
 
+    # Haszujemy hasło przed zapisem do bazy danych
     encrypted_password = get_hashed_password(user.password)
-    new_user = models.User(username=user.username, email=user.email, password=encrypted_password)
+    new_user = models.User(username=user.username, firstname=user.firstname, lastname=user.lastname, email=user.email,
+                           password=encrypted_password)
 
     session.add(new_user)
     session.commit()
@@ -58,6 +58,7 @@ def register_user(user: schemas.UserCreate, session: Session = Depends(get_sessi
     return {"message": "user created successfully"}
 
 
+# Endpoint do logowania użytkownika
 @app.post('/login', response_model=schemas.TokenSchema)
 def login(request: schemas.requestdetails, db: Session = Depends(get_session)):
     user = db.query(User).filter(User.email == request.email).first()
@@ -83,12 +84,15 @@ def login(request: schemas.requestdetails, db: Session = Depends(get_session)):
     }
 
 
+# Endpoint do zmiany hasła użytkownika
 @app.post('/change-password')
 def change_password(request: schemas.changepassword, db: Session = Depends(get_session)):
     user = db.query(models.User).filter(models.User.email == request.email).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
-
+    if request.new_password == "":
+        raise HTTPException(status_code=400,
+                            detail="New password cannot be None.")
     if not verify_password(request.old_password, user.password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid old password")
 
@@ -99,24 +103,23 @@ def change_password(request: schemas.changepassword, db: Session = Depends(get_s
     return {"message": "Password changed successfully"}
 
 
+# Funkcja dekorująca do sprawdzania tokena JWT
 def token_required(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-
         payload = decodeJWT(kwargs['dependencies'])
         user_id = payload['sub']
         data = kwargs['db'].query(models.TokenTable).filter_by(user_id=user_id, access_toke=kwargs['dependencies'],
                                                                status=True).first()
         if data:
             return func(**kwargs)
-
         else:
             return {'message': "Token blocked"}
 
     return wrapper
 
 
-
+# Endpoint do wylogowywania użytkownika
 @app.post('/logout')
 @token_required
 def logout(dependencies=Depends(JWTBearer()), db: Session = Depends(get_session)):
@@ -141,18 +144,23 @@ def logout(dependencies=Depends(JWTBearer()), db: Session = Depends(get_session)
     return {"message": "Logout Successfully"}
 
 
+# Endpoint do pobierania profilu użytkownika
 @app.get('/profile/{username}', response_model=schemas.UserProfile)
 def get_profile(username: str, db: Session = Depends(get_session)):
     user = db.query(models.User).filter(models.User.username == username).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
 
-    return {"id": user.id, "username": user.username, "email": user.email}
+    return {"username": user.username, "email": user.email, "firstname": user.firstname, "lastname": user.lastname}
 
 
+# Endpoint do aktualizacji profilu użytkownika
 @app.put("/profile/{username}")
 @token_required
 def update_profile(username: str, request: schemas.updateprofile, db: Session = Depends(get_session), dependencies=Depends(JWTBearer())):
+    if any(value == "" for value in [request.email, request.username, request.firstname, request.lastname]):
+        raise HTTPException(status_code=400,
+                            detail="Email and username cannot be None. Please provide valid values for all fields.")
     user = db.query(models.User).filter(models.User.username == username).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
@@ -175,12 +183,18 @@ def update_profile(username: str, request: schemas.updateprofile, db: Session = 
             raise HTTPException(status_code=400, detail="Email already used")
         user.email = request.email
 
+    if request.firstname:
+        user.firstname = request.firstname
+
+    if request.lastname:
+        user.lastname = request.lastname
+
     db.commit()
     db.refresh(user)
-
-    return {"id": user.id, "username": user.username, "email": user.email}
+    return {"username": user.username, "email": user.email, "firstname": user.firstname, "lastname": user.lastname}
 
 
 if __name__ == "__main__":
+    # Uruchomienie aplikacji za pomocą UVicorn na localhost:8000
+    webbrowser.open("http://127.0.0.1:8000/docs")
     uvicorn.run(app, host="127.0.0.1", port=8000)
-
